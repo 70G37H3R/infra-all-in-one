@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: latency-monitor
+  labels:
+    app: latency-monitor
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: latency-monitor
+  template:
+    metadata:
+      labels:
+        app: latency-monitor
+    spec:
+      nodeSelector:
+        {{- toYaml .Values.nodeSelector | nindent 8 }}
+
+      tolerations:
+        {{- toYaml .Values.tolerations | nindent 8 }}
+
+      containers:
+        - name: latency-monitor
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.targetPort }}
+              protocol: TCP
+
+          env:
+            - name: TARGET_HOST
+              value: {{ .Values.app.targetHost | quote }}
+            - name: TCP_PORT
+              value: {{ .Values.app.tcpPort | quote }}
+            - name: MEASURE_INTERVAL
+              value: {{ .Values.app.measureInterval | quote }}
+
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 15
+
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 200m
+              memory: 500Mi

@@ -1,0 +1,117 @@
+---
+# Source: helm/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: latency-monitor-service
+  labels:
+    app: latency-monitor
+spec:
+  type: ClusterIP
+  selector:
+    app: latency-monitor
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8000
+      protocol: TCP
+---
+# Source: helm/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: latency-monitor
+  labels:
+    app: latency-monitor
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: latency-monitor
+  template:
+    metadata:
+      labels:
+        app: latency-monitor
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: ip-10-0-1-168
+
+      tolerations:
+        - effect: NoSchedule
+          key: node-role.kubernetes.io/control-plane
+          operator: Exists
+
+      containers:
+        - name: latency-monitor
+          image: "cod3rdock3r/latency-monitor:v1.0"
+          imagePullPolicy: Always
+
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+
+          env:
+            - name: TARGET_HOST
+              value: "10.0.2.133"
+            - name: TCP_PORT
+              value: "22"
+            - name: MEASURE_INTERVAL
+              value: "30"
+
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 15
+
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 200m
+              memory: 500Mi
+---
+# Source: helm/templates/ingress.yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: latency-monitor-ingress
+  labels:
+    app: latency-monitor
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: latency-monitor.local
+      http:
+        paths:
+          - path: /latency
+            pathType: Prefix
+            backend:
+              service:
+                name: latency-monitor-service
+                port:
+                  name: http
+          - path: /metrics
+            pathType: Prefix
+            backend:
+              service:
+                name: latency-monitor-service
+                port:
+                  name: http
+          - path: /health
+            pathType: Prefix
+            backend:
+              service:
+                name: latency-monitor-service
+                port:
+                  name: http

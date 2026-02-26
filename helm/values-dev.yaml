@@ -1,0 +1,4 @@
+app:
+  targetHost: "10.0.2.145"
+  tcpPort: "22"
+  measureInterval: "30"

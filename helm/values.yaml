@@ -1,0 +1,38 @@
+image:
+  repository: cod3rdock3r/latency-monitor
+  tag: v1.0
+  pullPolicy: Always
+
+app:
+  targetHost: "10.0.2.133"
+  tcpPort: "22"
+  measureInterval: "30"
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8000
+
+ingress:
+  enabled: true
+  className: traefik
+  host: latency-monitor.local
+  paths:
+    - path: /latency
+      pathType: Prefix
+    - path: /metrics
+      pathType: Prefix
+    - path: /health
+      pathType: Prefix
+
+# Pin the pod to vm-0
+nodeSelector:
+  kubernetes.io/hostname: ip-10-0-1-168
+
+# vm-0 is the K3s control plane.
+# This toleration allows the pod to be scheduled there.
+tolerations:
+  - key: node-role.kubernetes.io/control-plane
+    operator: Exists
+    effect: NoSchedule
+
