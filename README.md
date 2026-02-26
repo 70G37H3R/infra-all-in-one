@@ -192,6 +192,38 @@ vm-1 ansible_host=10.0.2.133 ansible_user=ubuntu
 
 ### Step 5 — Run the Ansible Playbook
 
+#### Why not Docker container + cloud-init instead?
+
+The simpler-looking alternative would be to skip Kubernetes entirely — run the app as a Docker container on vm-0, configured through `cloud-init`, and call it done. Here is why that approach falls apart at every layer of the operational lifecycle.
+
+**cloud-init is a one-shot mechanism — it cannot be re-run**
+
+`cloud-init` executes once, on first boot, and never again. If the script fails halfway through — a package mirror is slow, a download times out, the Docker pull hits a rate limit — the instance is left in a partially configured state. There is no mechanism to resume or retry. You must terminate the instance and reprovision from scratch, losing any manually applied state in the process.
+
+Ansible runs on demand, from any machine with SSH access, any number of times. Every run re-converges the node toward the desired state. If a task fails, you fix the cause and re-run. The playbook picks up where it left off.
+
+**Docker run is not a deployment system**
+
+`docker run` starts a container. That is all it does. There is no:
+- Self-healing: if the container crashes, nothing restarts it unless you configure `--restart=always` and Docker daemon stays up
+- Health-aware routing: no readiness concept — traffic hits the container immediately on start regardless of whether the app is ready
+- Rolling updates: stopping the old container and starting the new one is a full outage window
+- Rollback: reverting to a previous version means manually pulling the old image tag and re-running `docker run`
+
+Kubernetes with Helm solves all of these natively. The Deployment controller manages rolling updates with zero downtime. The readinessProbe gates traffic until the app passes `/health`. A rollback is `helm rollback latency-monitor 1`.
+
+**Drift has no detection or remediation path**
+
+With `cloud-init + docker run`, if someone manually modifies the running container — changes an env var, restarts with a different image, stops the container — there is no way to detect or recover the drift short of SSHing in and inspecting manually. The "desired state" only exists as a comment in a YAML file somewhere.
+
+Helm tracks desired state inside the cluster as a versioned release. `helm diff` or `helm status` immediately shows you if the running resources deviate from the declared chart. Ansible tracks OS-level state through idempotency — re-running the playbook remediates drift automatically.
+
+**Scaling exposes the structural limit**
+
+Adding a second app instance with `docker run` means SSHing into another machine, re-running the same command, and manually managing load balancing. cloud-init cannot orchestrate across multiple nodes.
+
+Kubernetes scales horizontally by changing a single field (`replicas: 2`). Helm deploys that change cluster-wide. Ansible can provision N new nodes and join them to the cluster without any change to the playbook itself.
+
 ```bash
 cd ~/k3s-ansible
 chmod 400 terraform-devops.pem
@@ -278,6 +310,18 @@ curl http://latency-monitor.local/health
 ## Latency Monitor App
 
 FastAPI service running on vm-0. Every `MEASURE_INTERVAL` seconds it opens a TCP connection to vm-1 and measures how long the handshake takes — the programmatic equivalent of `telnet <host> <port>`.
+
+### Why TCP instead of ICMP (ping)?
+
+| Criterion | ICMP Ping | TCP Connect |
+|-----------|-----------|-------------|
+| Blocked by firewall | Frequently | Rarely (app ports must be open) |
+| Reflects real app latency | No (ICMP is low priority) | Yes (same path as app traffic) |
+| Requires root / CAP_NET_RAW | Yes | No |
+| Measures app availability | No | Yes (specific port) |
+| False negatives | Many | Few |
+
+TCP connect is more reliable in cloud environments, requires no elevated privileges, verifies actual service reachability rather than just IP connectivity, and measures the latency that application clients actually experience.
 
 ### Environment variables
 
