@@ -194,9 +194,9 @@ vm-1 ansible_host=10.0.2.133 ansible_user=ubuntu
 
 #### Why not Docker container + cloud-init instead?
 
-The simpler-looking alternative would be to skip Kubernetes entirely — run the app as a Docker container on vm-0, configured through `cloud-init`, and call it done. Here is why that approach falls apart at every layer of the operational lifecycle.
+The simpler-looking alternative would be run the app as a Docker container on vm-0, configured through `cloud-init`, and call it done. Here is why that approach falls apart at every layer of the operational lifecycle.
 
-**cloud-init is a one-shot mechanism — it cannot be re-run**
+**cloud-init is a one-shot mechanism**
 
 `cloud-init` executes once, on first boot, and never again. If the script fails halfway through — a package mirror is slow, a download times out, the Docker pull hits a rate limit — the instance is left in a partially configured state. There is no mechanism to resume or retry. You must terminate the instance and reprovision from scratch, losing any manually applied state in the process.
 
