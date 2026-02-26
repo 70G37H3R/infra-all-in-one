@@ -291,11 +291,11 @@ FastAPI service running on vm-0. Every `MEASURE_INTERVAL` seconds it opens a TCP
 
 ```bash
 docker build -t latency-monitor:latest ./application
-docker run -p 8000:8000 -e TARGET_HOST=10.0.2.133 latency-monitor:latest
+docker run -p 8000:8000 -e TARGET_HOST=<PUBLIC-IP> latency-monitor:latest
 ```
 OR
 ```bash
-docker run -p 8000:8000 -e TARGET_HOST=10.0.2.133 cod3rdock3r/latency-monitor:v1.0
+docker run -p 8000:8000 -e TARGET_HOST=<PUBLIC-IP> cod3rdock3r/latency-monitor:v1.0
 
 ```
 ### Endpoints
