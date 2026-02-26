@@ -30,7 +30,7 @@ A fully automated pipeline to provision a two-node K3s Kubernetes cluster on AWS
 **Provisioning flow:**
 
 ```
-Terraform → EC2 × 2 → Ansible → K3s cluster → Helm → Application
+Terraform → AWS EC2 → Ansible → K3s cluster → Helm → Application
 ```
 
 ---
